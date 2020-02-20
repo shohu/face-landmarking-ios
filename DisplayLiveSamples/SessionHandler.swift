@@ -6,14 +6,16 @@
 //  Copyright © 2016 ZweiGraf. All rights reserved.
 //
 
+import UIKit
 import AVFoundation
 
 class SessionHandler : NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureMetadataOutputObjectsDelegate {
     var session = AVCaptureSession()
     let layer = AVSampleBufferDisplayLayer()
-    let sampleQueue = DispatchQueue(label: "com.zweigraf.DisplayLiveSamples.sampleQueue", attributes: [])
-    let faceQueue = DispatchQueue(label: "com.zweigraf.DisplayLiveSamples.faceQueue", attributes: [])
+    let sampleQueue = DispatchQueue(label: "com.shohu.DisplayLiveSamples.sampleQueue", attributes: [])
+    let faceQueue = DispatchQueue(label: "com.shohu.DisplayLiveSamples.faceQueue", attributes: [])
     let wrapper = DlibWrapper()
+    var countLabel = UILabel();
     
     var currentMetadata: [AnyObject]
     
@@ -22,7 +24,12 @@ class SessionHandler : NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, A
         super.init()
     }
     
+    func settings(_ label:UILabel) {
+        countLabel = label;
+    }
+    
     func openSession() {
+        // Videoのdeviceオブジェクトを取得
         let device = AVCaptureDevice.devices(for: AVMediaType.video)
             .map { $0 }
             .filter { $0.position == .front}
@@ -30,6 +37,8 @@ class SessionHandler : NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, A
         
         let input = try! AVCaptureDeviceInput(device: device)
         
+        // TODO: sampleQueueとfaceQueueの違いは？
+        //フレーム毎に呼び出すデリゲート登録
         let output = AVCaptureVideoDataOutput()
         output.setSampleBufferDelegate(self, queue: sampleQueue)
         
@@ -51,7 +60,7 @@ class SessionHandler : NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, A
         session.commitConfiguration()
         
         let settings: [AnyHashable: Any] = [kCVPixelBufferPixelFormatTypeKey as AnyHashable: Int(kCVPixelFormatType_32BGRA)]
-        output.videoSettings = settings as! [String : Any]
+        output.videoSettings = settings as? [String : Any]
     
         // availableMetadataObjectTypes change when output is added to session.
         // before it is added, availableMetadataObjectTypes is empty
@@ -64,18 +73,16 @@ class SessionHandler : NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, A
     
     // MARK: AVCaptureVideoDataOutputSampleBufferDelegate
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-
         if !currentMetadata.isEmpty {
             let boundsArray = currentMetadata
                 .flatMap { $0 as? AVMetadataFaceObject }
                 .map { (faceObject) -> NSValue in
                     let convertedObject = output.transformedMetadataObject(for: faceObject, connection: connection)
                     return NSValue(cgRect: convertedObject!.bounds)
-            }
-            
+                }
             wrapper?.doWork(on: sampleBuffer, inRects: boundsArray)
+            countLabel.text = String(wrapper?.getEyeBlinkCount() ?? 0);
         }
-
         layer.enqueue(sampleBuffer)
     }
     

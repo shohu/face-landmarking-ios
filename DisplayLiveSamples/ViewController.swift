@@ -12,6 +12,7 @@ import AVFoundation
 class ViewController: UIViewController {
     let sessionHandler = SessionHandler()
     
+    @IBOutlet weak var countLabel: UILabel!
     @IBOutlet weak var preview: UIView!
     
     override func viewDidLoad() {
@@ -34,8 +35,12 @@ class ViewController: UIViewController {
         layer.frame = preview.bounds
 
         preview.layer.addSublayer(layer)
-        
+        preview.bringSubviewToFront(countLabel) //ラベルを最前面に移動
+
         view.layoutIfNeeded()
+        
+        sessionHandler.settings(countLabel);
+        
 
     }
 
